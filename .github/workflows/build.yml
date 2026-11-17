@@ -20,5 +20,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Drum-Pattern-Generator-VST3-Windows
-          path: build/DrumPatternGenerator_artefacts/Release/VST3/
+          path: build/DrumPatternGenerator_artefacts/Release/VST3/*.vst3
           if-no-files-found: error
