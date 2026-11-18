@@ -48,6 +48,7 @@ public:
     std::atomic<int> mapSel { 0 };
     std::atomic<int> learnLane { -1 };
     std::atomic<bool> isPlayingNow { false };
+    std::atomic<float> uiScale { 1.0f };      // editor window size, remembered per instance
 
     int  getStep (int lane, int s) const   { return steps[(size_t) (lane * NS + s)].load(); }
     void setStep (int lane, int s, int v)  { steps[(size_t) (lane * NS + s)].store (v); }

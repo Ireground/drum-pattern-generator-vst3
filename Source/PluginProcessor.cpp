@@ -508,6 +508,7 @@ void DrumProcessor::getStateInformation (juce::MemoryBlock& destData)
 
     auto* pat = xml->createNewChildElement ("Pattern");
     pat->setAttribute ("map", mapSel.load());
+    pat->setAttribute ("uiScale", (double) uiScale.load());
     for (int l = 0; l < NL; ++l)
     {
         auto* lane = pat->createNewChildElement ("Lane");
@@ -532,6 +533,7 @@ void DrumProcessor::setStateInformation (const void* data, int sizeInBytes)
     if (auto* pat = xml->getChildByName ("Pattern"))
     {
         mapSel = pat->getIntAttribute ("map", 0);
+        uiScale = (float) juce::jlimit (0.6, 1.6, pat->getDoubleAttribute ("uiScale", 1.0));
         int l = 0;
         for (auto* lane : pat->getChildWithTagNameIterator ("Lane"))
         {

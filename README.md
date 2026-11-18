@@ -11,7 +11,11 @@ and lets you **drag the pattern straight onto a REAPER track** as a MIDI item.
 4. In REAPER: Options > Preferences > Plug-ins > VST > **Re-scan**.
 
 ## Use
-- Put it on a track **before your drum plugin**; it plays in sync with the transport.
-- **Drag MIDI**: drop the pattern onto the arrange view. **Drag: N bars** sets how long the dropped item is.
-- RANDOMIZE / Mutate / Clear / Undo, per-lane Mute / Solo / Lock / Rnd, Note, Length (polymeter) and Chance.
+- Put it on a track **before your drum plugin**; with **Sync to host** on it plays with the transport.
+- **Style** (title bar): pick with the arrows or click the name for a list.
+- **Randomize / Mutate / Clear / Undo** tabs above the grid.
+- Knobs: **Complexity**, **Swing**, **Vel Humanize**, **Note Length** (drag up/down, Shift = fine, double-click = reset).
+- Per lane: Mute / Solo / Lock / Rnd, Note, Length (polymeter) and Chance.
 - Right-click a Note box and play a key to learn the note. Right-drag a step to set its velocity.
+- **Drag MIDI**: drop the pattern onto a REAPER track. **Length** sets how many bars the dropped item is.
+- The window is resizable (drag the bottom-right corner); the size is remembered.
