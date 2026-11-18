@@ -160,8 +160,8 @@ DrumEditor::Target DrumEditor::targetAt (juce::Point<int> pt) const
             if (rectFor (k, lane).contains (pt))
                 return { k, lane, -1 };
 
-        const int step = (pt.x - gx) / cw;
-        if (pt.x >= gx && step >= 0 && step < DrumProcessor::NS)
+        const int step = (int) std::floor ((float) (pt.x - gx) / cellW());
+        if (pt.x >= gx && step >= 0 && step < visibleSteps())
             return { Grid, lane, step };
     }
     return {};
@@ -223,7 +223,7 @@ int DrumEditor::maxValue (Kind k) const
         case KnobSwing: return 75;
         case KnobVel:   return 40;
         case LaneNote:  return 127;
-        case LaneLen:   return DrumProcessor::NS;
+        case LaneLen:   return visibleSteps();
         default:        return 100;
     }
 }
@@ -755,7 +755,10 @@ void DrumEditor::drawGrid (juce::Graphics& g)
 {
     auto& p = processor;
     const int learn = p.learnLane.load();
-    const int gridW = DrumProcessor::NS * cw;
+    const int   n  = visibleSteps();
+    const float cw = cellW();
+    const int   spb = stepsPerBeat();
+    const float gap = cw > 12.0f ? 2.0f : 1.0f;
 
     // column headers
     g.setColour (dimText);
@@ -769,10 +772,10 @@ void DrumEditor::drawGrid (juce::Graphics& g)
     g.drawText ("CHANCE",  439, 92, 40, 14, juce::Justification::centred);
 
     // step number tabs
-    for (int s = 0; s < DrumProcessor::NS; ++s)
+    for (int s = 0; s < n; ++s)
     {
-        const auto r = juce::Rectangle<float> ((float) (gx + s * cw), 91.0f, (float) (cw - 2), 15.0f);
-        const bool beat = s % 4 == 0;
+        const auto r = juce::Rectangle<float> ((float) gx + s * cw, 91.0f, cw - gap, 15.0f);
+        const bool beat = s % spb == 0;
         g.setColour (beat ? blueDark : hex (0x2b2f34));
         g.fillRoundedRectangle (r, 2.0f);
         g.setColour (beat ? juce::Colours::white : dimText);
@@ -825,11 +828,11 @@ void DrumEditor::drawGrid (juce::Graphics& g)
         // steps
         const int len = p.laneLen[li];
         const int cur = p.isPlayingNow ? p.currentStep[li].load() : -1;
-        for (int s = 0; s < DrumProcessor::NS; ++s)
+        for (int s = 0; s < n; ++s)
         {
-            const auto cell = juce::Rectangle<float> ((float) (gx + s * cw), (float) y + 5.0f, (float) (cw - 2), (float) rh - 10.0f);
+            const auto cell = juce::Rectangle<float> ((float) gx + s * cw, (float) y + 5.0f, cw - gap, (float) rh - 10.0f);
             const bool inLen = s < len;
-            g.setColour (inLen ? ((s / 4) % 2 == 0 ? hex (0x272a2e) : hex (0x222528)) : hex (0x1a1c1e));
+            g.setColour (inLen ? ((s / spb) % 2 == 0 ? hex (0x272a2e) : hex (0x222528)) : hex (0x1a1c1e));
             g.fillRect (cell);
 
             const int v = p.getStep (l, s);
@@ -1007,6 +1010,6 @@ void DrumEditor::paint (juce::Graphics& g)
 
     drawSectionHeader (g, { 1052, 360, 172, 18 }, "EXPORT", blue);
     const int bars = exportBarCounts[(size_t) juce::jlimit (0, 3, p.param ("exportbars"))];
-    drawMenuBox (g, BoxExportBars, "LENGTH", juce::String (bars) + (bars > 1 ? " bars" : " bar"));
+    drawMenuBox (g, BoxExportBars, "CLIP", juce::String (bars) + (bars > 1 ? " bars" : " bar"));
     drawExport (g);
 }

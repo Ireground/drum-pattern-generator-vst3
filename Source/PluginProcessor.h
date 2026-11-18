@@ -5,14 +5,16 @@
 #include <array>
 #include <atomic>
 
-class DrumProcessor : public juce::AudioProcessor
+class DrumProcessor : public juce::AudioProcessor,
+                      private juce::AudioProcessorValueTreeState::Listener,
+                      private juce::AsyncUpdater
 {
 public:
     static constexpr int NL = 8;   // lanes
     static constexpr int NS = 32;  // max steps per lane
 
     DrumProcessor();
-    ~DrumProcessor() override = default;
+    ~DrumProcessor() override;
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
@@ -57,6 +59,8 @@ public:
     int  param (const char* id) const;
     void setParam (const char* id, float value);
     double stepBeats() const;               // length of one step in quarter notes
+    static int stepsPerBarFor (int rate);   // 8, 16, 32, 12 or 24
+    int stepsPerBar() const { return stepsPerBarFor (param ("rate")); }
     static const char* laneName (int i);
     static const char* styleName (int i);
     static const char* rateName (int i);
@@ -75,6 +79,11 @@ public:
 
 private:
     void defaultPattern();
+    void stepPosition (int s, int& pos16, bool& onGrid) const;
+    void adaptToRate (int oldRate, int newRate);
+    void parameterChanged (const juce::String& id, float) override;
+    void handleAsyncUpdate() override;
+    std::atomic<int> lastRate { 1 };
     float styleProbability (int style, int lane, int pos, float c) const;
     int styleVelocity (int lane, int pos);
     void allNotesOff (juce::MidiBuffer& midi);

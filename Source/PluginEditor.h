@@ -96,7 +96,11 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
 
     // grid geometry
-    static constexpr int laneX = 216, gx = 486, gy = 112, rh = 54, cw = 17;
+    // The grid always shows one bar; its cells widen or narrow to fill gridW.
+    static constexpr int laneX = 216, gx = 486, gy = 112, rh = 54, gridW = 544;
+    int   visibleSteps() const { return processor.stepsPerBar(); }
+    float cellW() const        { return (float) gridW / (float) visibleSteps(); }
+    int   stepsPerBeat() const { return juce::jmax (1, visibleSteps() / 4); }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DrumEditor)
 };

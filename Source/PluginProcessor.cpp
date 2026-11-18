@@ -18,6 +18,75 @@ DrumProcessor::DrumProcessor()
     }
     applyMap (0);
     defaultPattern();
+    lastRate = param ("rate");
+    apvts.addParameterListener ("rate", this);
+}
+
+DrumProcessor::~DrumProcessor()
+{
+    apvts.removeParameterListener ("rate", this);
+    cancelPendingUpdate();
+}
+
+// Rate can change from the GUI or from host automation (possibly on the audio thread),
+// so the pattern conversion is done asynchronously on the message thread.
+void DrumProcessor::parameterChanged (const juce::String&, float) { triggerAsyncUpdate(); }
+
+void DrumProcessor::handleAsyncUpdate()
+{
+    const int now = param ("rate");
+    const int before = lastRate.exchange (now);
+    if (before != now) adaptToRate (before, now);
+}
+
+int DrumProcessor::stepsPerBarFor (int rate)
+{
+    switch (rate)
+    {
+        case 0:  return 8;
+        case 2:  return 32;
+        case 3:  return 12;
+        case 4:  return 24;
+        default: return 16;
+    }
+}
+
+// Convert the pattern so the groove keeps its timing on the new grid:
+// a hit stays where it was in the bar (if that position exists in the new grid),
+// and each lane's length scales with the grid (a full-bar lane stays a full bar).
+void DrumProcessor::adaptToRate (int oldRate, int newRate)
+{
+    const int oldN = stepsPerBarFor (oldRate), newN = stepsPerBarFor (newRate);
+    if (oldN == newN) return;
+    saveUndo();
+    for (int l = 0; l < NL; ++l)
+    {
+        std::array<int, NS> old {};
+        for (int s = 0; s < NS; ++s) old[(size_t) s] = getStep (l, s);
+
+        for (int s = 0; s < NS; ++s)
+        {
+            int v = 0;
+            if (s < newN)
+            {
+                const double src = (double) s * oldN / newN;
+                const int si = juce::roundToInt (src);
+                if (std::abs (src - si) < 1.0e-6 && si < NS) v = old[(size_t) si];
+            }
+            setStep (l, s, v);
+        }
+        const int len = laneLen[(size_t) l];
+        laneLen[(size_t) l] = juce::jlimit (1, newN, juce::roundToInt ((double) len * newN / oldN));
+    }
+}
+
+// Where step s falls in the bar, in 16th notes (0..15), and whether it sits exactly on a 16th.
+void DrumProcessor::stepPosition (int s, int& pos16, bool& onGrid) const
+{
+    const double sixteenths = s * stepBeats() * 4.0;
+    const double r = std::round (sixteenths);
+    onGrid = std::abs (sixteenths - r) < 1.0e-6;
+    pos16 = ((int) (onGrid ? r : std::floor (sixteenths))) % 16;
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout DrumProcessor::createLayout()
@@ -219,11 +288,16 @@ void DrumProcessor::randomizeLane (int l)
     const float c = param ("complexity") / 100.0f;
     for (int s = 0; s < NS; ++s)
     {
-        const int pos = s % 16;
+        int pos = 0; bool onGrid = true;
+        stepPosition (s, pos, onGrid);
         if (s < laneLen[(size_t) l])
         {
-            const float p = styleProbability (style, l, pos, c);
-            setStep (l, s, rng.nextFloat() < p ? styleVelocity (l, pos) : 0);
+            float p = styleProbability (style, l, pos, c);
+            // in-between positions (1/32 or triplet grids): occasional ghost notes, mostly on hats
+            if (! onGrid) p *= (l == 3 || l == 4) ? 0.5f * c : (l == 0 ? 0.08f : 0.15f) * c;
+            int v = styleVelocity (l, pos);
+            if (! onGrid) v = juce::jmax (1, (int) (v * 0.7f));
+            setStep (l, s, rng.nextFloat() < p ? v : 0);
         }
         else
         {
@@ -261,9 +335,13 @@ void DrumProcessor::mutateAll()
         {
             if (rng.nextFloat() < m)
             {
-                const int pos = s % 16;
-                const float p = styleProbability (style, l, pos, c);
-                setStep (l, s, rng.nextFloat() < p ? styleVelocity (l, pos) : 0);
+                int pos = 0; bool onGrid = true;
+                stepPosition (s, pos, onGrid);
+                float p = styleProbability (style, l, pos, c);
+                if (! onGrid) p *= (l == 3 || l == 4) ? 0.5f * c : (l == 0 ? 0.08f : 0.15f) * c;
+                int v = styleVelocity (l, pos);
+                if (! onGrid) v = juce::jmax (1, (int) (v * 0.7f));
+                setStep (l, s, rng.nextFloat() < p ? v : 0);
             }
         }
     }
@@ -552,6 +630,10 @@ void DrumProcessor::setStateInformation (const void* data, int sizeInBytes)
         xml->removeChildElement (pat, true);
     }
     apvts.replaceState (juce::ValueTree::fromXml (*xml));
+    lastRate = param ("rate");   // loaded pattern already matches its rate: don't convert it
+    const int n = stepsPerBar();
+    for (int l = 0; l < NL; ++l)
+        laneLen[(size_t) l] = juce::jlimit (1, n, laneLen[(size_t) l].load());
 }
 
 juce::AudioProcessorEditor* DrumProcessor::createEditor()
